@@ -71,7 +71,7 @@ model = Net()
 if args.cuda:
     model.cuda()
 
-optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
+optimizer = optim.Adam(model.parameters(), lr=args.lr, momentum=args.momentum)
 
 def train(epoch):
     model.train()
