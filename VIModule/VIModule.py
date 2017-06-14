@@ -34,13 +34,13 @@ class VILinear(nn.Module):
 
     def forward(self, input):
 
-        self.eps_weight.data.normal_()
+        self.eps_weight.normal_()
         weight = self.mean_weight + (1 + self.rho_weight.exp()).log() *\
                 Variable(self.eps_weight, requires_grad=False)
         if self.mean_bias is None:
             return self._backend.Linear()(input, weight)
         else:
-            self.eps_bias.data.normal_()
+            self.eps_bias.normal_()
             bias = self.mean_bias + (1 +
                                      self.rho_bias.exp()).log()*Variable(self.eps_bias,
                                                                          requires_grad=False)
