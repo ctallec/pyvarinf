@@ -14,8 +14,11 @@ class VILinear(nn.Module):
         self.mean_weight = Parameter(torch.zeros(out_features, in_features))
         self.rho_weight = Parameter(torch.Tensor(out_features, in_features))
         self.eps_weight = Variable(torch.Tensor(out_features, in_features))
+
+        self.register_buffer('eps_weight', self.eps_weight)
         if bias:
             self.eps_bias = Variable(torch.Tensor(out_features))
+            self.register_buffer('eps_bias', self.eps_bias)
             self.mean_bias = Parameter(torch.zeros(out_features))
             self.rho_bias = Parameter(torch.Tensor(out_features))
         else:
@@ -41,15 +44,6 @@ class VILinear(nn.Module):
             bias = self.mean_bias + (1 +
                                      self.rho_bias.exp()).log()*self.eps_bias
             return self._backend.Linear()(input, weight, bias)
-
-    def cuda(self):
-        super().cuda()
-        print("Ok")
-        self.eps_weight.data = self.eps_weight.data.cuda()
-        self.eps_weight._grad.data = self.eps_weight._grad.data.cuda()
-        if self.mean_bias:
-            self.eps_bias.data = self.eps_bias.data.cuda()
-            self.eps_bias._grad.data = self.eps_bias._grad.data.cuda()
 
     def kl_loss(self):
         stdv = 1. / math.sqrt(self.mean_weight.size(1))
