@@ -31,11 +31,15 @@ class VILinear(nn.Module):
 
     def forward(self, input):
 
-        weight = self.mean_weight + (1 + self.rho_weight.exp()).log()
+        self.eps_weight.data.normal_()
+        weight = self.mean_weight + (1 + self.rho_weight.exp()).log() *\
+                self.eps_weight
         if self.mean_bias is None:
             return self._backend.Linear()(input, weight)
         else:
-            bias = self.mean_bias + (1 + self.rho_bias.exp()).log()
+            self.eps_bias.data.normal_()
+            bias = self.mean_bias + (1 +
+                                     self.rho_bias.exp()).log()*self.eps_bias
             return self._backend.Linear()(input, weight, bias)
 
     def kl_loss(self):
