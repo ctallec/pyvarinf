@@ -44,9 +44,11 @@ class VILinear(nn.Module):
 
     def cuda(self):
         super().cuda()
-        self.eps_weight.cuda()
+        self.eps_weight.data = self.eps_weight.data.cuda()
+        self.eps_weight._grad.data = self.eps_weight._grad.data.cuda()
         if self.mean_bias:
-            self.eps_bias.cuda()
+            self.eps_bias.data = self.eps_bias.data.cuda()
+            self.eps_bias._grad.data = self.eps_bias._grad.data.cuda()
 
     def kl_loss(self):
         stdv = 1. / math.sqrt(self.mean_weight.size(1))
