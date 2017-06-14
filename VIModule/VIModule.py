@@ -44,6 +44,7 @@ class VILinear(nn.Module):
 
     def cuda(self):
         super().cuda()
+        print("Ok")
         self.eps_weight.data = self.eps_weight.data.cuda()
         self.eps_weight._grad.data = self.eps_weight._grad.data.cuda()
         if self.mean_bias:
