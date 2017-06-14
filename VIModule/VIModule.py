@@ -42,6 +42,12 @@ class VILinear(nn.Module):
                                      self.rho_bias.exp()).log()*self.eps_bias
             return self._backend.Linear()(input, weight, bias)
 
+    def cuda(self):
+        super().cuda()
+        self.eps_weight.cuda()
+        if self.mean_bias:
+            self.eps_bias.cuda()
+
     def kl_loss(self):
         stdv = 1. / math.sqrt(self.mean_weight.size(1))
         sigma_weight = (1 + self.rho_weight.exp()).log()
