@@ -13,11 +13,11 @@ class VILinear(nn.Module):
         self.out_features = out_features
         self.mean_weight = Parameter(torch.zeros(out_features, in_features))
         self.rho_weight = Parameter(torch.Tensor(out_features, in_features))
-        self.eps_weight = Variable(torch.Tensor(out_features, in_features))
+        self.eps_weight = torch.Tensor(out_features, in_features)
 
         self.register_buffer('eps_weight', self.eps_weight)
         if bias:
-            self.eps_bias = Variable(torch.Tensor(out_features))
+            self.eps_bias = torch.Tensor(out_features)
             self.register_buffer('eps_bias', self.eps_bias)
             self.mean_bias = Parameter(torch.zeros(out_features))
             self.rho_bias = Parameter(torch.Tensor(out_features))
@@ -36,13 +36,14 @@ class VILinear(nn.Module):
 
         self.eps_weight.data.normal_()
         weight = self.mean_weight + (1 + self.rho_weight.exp()).log() *\
-                self.eps_weight
+                Variable(self.eps_weight, requires_grad=False)
         if self.mean_bias is None:
             return self._backend.Linear()(input, weight)
         else:
             self.eps_bias.data.normal_()
             bias = self.mean_bias + (1 +
-                                     self.rho_bias.exp()).log()*self.eps_bias
+                                     self.rho_bias.exp()).log()*Variable(self.eps_bias,
+                                                                         requires_grad=False)
             return self._backend.Linear()(input, weight, bias)
 
     def kl_loss(self):
