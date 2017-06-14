@@ -56,12 +56,14 @@ class Net(nn.Module):
         super(Net, self).__init__()
         self.fc1 = VILinear(784, 256)
         self.fc2 = VILinear(256, 256)
-        self.fc3 = VILinear(256, 10)
+        self.fc3 = VILinear(256, 256)
+        self.fc4 = VILinear(256, 10)
 
     def forward(self, x):
         x = F.relu(self.fc1(x.view(-1, 784)))
         x = F.relu(self.fc2(x))
-        x = self.fc3(x)
+        x = F.relu(self.fc3(x))
+        x = self.fc4(x)
         return F.log_softmax(x)
 
     def kl_loss(self):
