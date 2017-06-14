@@ -13,17 +13,16 @@ class VILinear(nn.Module):
         self.out_features = out_features
         self.mean_weight = Parameter(torch.zeros(out_features, in_features))
         self.rho_weight = Parameter(torch.Tensor(out_features, in_features))
-        self.eps_weight = torch.Tensor(out_features, in_features)
+        self.eps_weight = Parameter(torch.Tensor(out_features, in_features))
 
-        self.register_buffer('eps_weight', self.eps_weight)
         if bias:
-            self.eps_bias = torch.Tensor(out_features)
-            self.register_buffer('eps_bias', self.eps_bias)
+            self.eps_bias = Parameter(torch.Tensor(out_features))
             self.mean_bias = Parameter(torch.zeros(out_features))
             self.rho_bias = Parameter(torch.Tensor(out_features))
         else:
             self.register_parameter('mean_bias', None)
             self.register_parameter('rho_bias', None)
+            self.register_parameter('eps_bias', None)
         self.reset_parameters()
 
     def reset_parameters(self):
