@@ -11,14 +11,40 @@ from torch.nn.parameter import Parameter
 VariationalParameter = namedtuple('VariationalParameter',
                                   ['mean', 'rho', 'eps'])
 
-def rebuild_parameters(dico, module):
+def rebuild_parameters(dico, module, train):
     for name, p in dico.items():
         if isinstance(p, VariationalParameter):
-            p.eps.data.normal_()
+            if train:
+                p.eps.data.normal_()
+            else:
+                p.eps.data.fill_(0)
             setattr(module, name, p.mean +\
                     (1+p.rho.exp()).log() * p.eps)
         else:
-            rebuild_parameters(p, getattr(module, name))
+            rebuild_parameters(p, getattr(module, name), train)
+
+def prior_std(p):
+    stdv = 0
+    if p.dim() > 1:
+        for i in range(p.dim()-1):
+            stdv = stdv + p.size()[i+1]
+        stdv = 1 / math.sqrt(stdv)
+    else:
+        stdv = 1
+    return stdv
+
+def sub_prior_loss(dico):
+    loss = 0
+    for name, p in dico.items():
+        if isinstance(p, VariationalParameter):
+            mean = p.mean
+            std = (1+p.rho.exp()).log()
+            std_prior = prior_std(mean)
+            loss += (-(std/std_prior).log() + (std.pow(2) +\
+                         mean.pow(2)) / (2 * std_prior ** 2) - 1/2).sum()
+        else:
+            loss += sub_prior_loss(p)
+    return loss
 
 class Variationalize(nn.Module):
     def __init__(self, model):
@@ -31,14 +57,8 @@ class Variationalize(nn.Module):
     def variationalize_module(self, dico, module, prefix):
         to_erase = []
         for name, p in module._parameters.items():
-            stdv = 0
-            if p.dim() > 1:
-                for i in range(p.dim()-1):
-                    stdv = stdv + p.size()[i+1]
-                stdv = 1 / math.sqrt(stdv)
-                init_rho = math.log(math.exp(stdv) - 1)
-            else:
-                init_rho = 1
+            stdv = prior_std(p)
+            init_rho = math.log(math.exp(stdv) - 1)
 
             dico[name] = VariationalParameter(
                 Parameter(p.data.clone().fill_(0)),
@@ -63,25 +83,8 @@ class Variationalize(nn.Module):
             dico[mname] = sub_dico
 
     def forward(self, *input):
-        rebuild_parameters(self.dico, self.model)
+        rebuild_parameters(self.dico, self.model, self.training)
         return self.model(*input)
 
-class Model(nn.Module):
-    def __init__(self):
-        super().__init__()
-        nn.Conv2d
-        self.fc1 = nn.Linear(10, 100)
-        self.fc2 = nn.Linear(100, 100)
-        self.fc3 = nn.Linear(100, 10)
-
-    def forward(self, input):
-        input = F.relu(self.fc1(input))
-        input = F.relu(self.fc2(input))
-        input = self.fc3(input)
-        return F.log_softmax(input)
-
-model = Model()
-var_model = Variationalize(model)
-print(var_model(Variable(torch.Tensor(10, 10))))
-for p in var_model.parameters():
-    print(p)
+    def prior_loss(self):
+        return sub_prior_loss(self.dico)
