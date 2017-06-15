@@ -61,7 +61,7 @@ class Variationalize(nn.Module):
             init_rho = math.log(math.exp(stdv) - 1)
 
             dico[name] = VariationalParameter(
-                Parameter(p.data.clone().fill_(0)),
+                Parameter(p.data.clone()),
                 Parameter(p.data.clone().fill_(init_rho)),
                 Parameter(p.data.clone()))
             # eps is a Parameter to benefit from cuda()

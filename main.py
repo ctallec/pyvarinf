@@ -72,9 +72,10 @@ class Net(nn.Module):
 model = Net()
 var_model = Variationalize(model)
 if args.cuda:
-    model.cuda()
+    var_model.cuda()
 
-optimizer = optim.SGD(var_model.parameters(), lr=args.lr, momentum=args.momentum)
+optimizer = optim.SGD(var_model.parameters(), lr=args.lr,
+                      momentum=args.momentum)
 
 def train(epoch):
     var_model.train()
@@ -84,7 +85,7 @@ def train(epoch):
         data, target = Variable(data), Variable(target)
         optimizer.zero_grad()
         output = var_model(data)
-        loss = F.nll_loss(output, target) + var_model.prior_loss() / 60000
+        loss = F.nll_loss(output, target) #+ var_model.prior_loss() / 60000
         loss.backward()
         optimizer.step()
         if batch_idx % args.log_interval == 0:
