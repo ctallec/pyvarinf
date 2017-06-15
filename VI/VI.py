@@ -14,6 +14,8 @@ VariationalParameter = namedtuple('VariationalParameter',
 def rebuild_parameters(dico, module, train):
     for name, p in dico.items():
         if isinstance(p, VariationalParameter):
+            if p.eps is None:
+                p = p._replace(eps=Variable(p.mean.data.clone()))
             if train:
                 p.eps.data.normal_()
             else:
@@ -24,13 +26,13 @@ def rebuild_parameters(dico, module, train):
             rebuild_parameters(p, getattr(module, name), train)
 
 def prior_std(p):
-    stdv = 0
+    stdv = 1
     if p.dim() > 1:
         for i in range(p.dim()-1):
-            stdv = stdv + p.size()[i+1]
+            stdv = stdv * p.size()[i+1]
         stdv = 1 / math.sqrt(stdv)
     else:
-        stdv = 1
+        stdv = 1e-2
     return stdv
 
 def sub_prior_loss(dico):
@@ -61,17 +63,14 @@ class Variationalize(nn.Module):
             init_rho = math.log(math.exp(stdv) - 1)
 
             dico[name] = VariationalParameter(
-                Parameter(p.data.clone()),
+                Parameter(p.data.clone().fill_(0)),
                 Parameter(p.data.clone().fill_(init_rho)),
-                Parameter(p.data.clone()))
-            # eps is a Parameter to benefit from cuda()
+                None)
 
             self.register_parameter(prefix + '.' + name + '_mean',
                                    dico[name].mean)
             self.register_parameter(prefix + '.' + name + '_rho',
                                    dico[name].rho)
-            self.register_parameter(prefix + '.' + name + '_eps',
-                                   dico[name].eps)
 
 
             to_erase.append(name)
