@@ -63,11 +63,15 @@ class Variationalize(nn.Module):
             dico[name] = VariationalParameter(
                 Parameter(p.data.clone().fill_(0)),
                 Parameter(p.data.clone().fill_(init_rho)),
-                Variable(p.data.clone()))
+                Parameter(p.data.clone()))
+            # eps is a Parameter to benefit from cuda()
+
             self.register_parameter(prefix + '.' + name + '_mean',
                                    dico[name].mean)
             self.register_parameter(prefix + '.' + name + '_rho',
                                    dico[name].rho)
+            self.register_parameter(prefix + '.' + name + '_eps',
+                                   dico[name].eps)
 
 
             to_erase.append(name)
