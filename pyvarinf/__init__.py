@@ -1,0 +1,1 @@
+from .vi import joke
