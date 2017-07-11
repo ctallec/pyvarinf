@@ -11,21 +11,46 @@ from torch.nn.parameter import Parameter
 VariationalParameter = namedtuple('VariationalParameter',
                                   ['mean', 'rho', 'eps'])
 
-def rebuild_parameters(dico, module, train):
+def rebuild_parameters(dico, module, epsilon_setting):
+    """ Rebuild parameters.
+    
+    Build the computational graph corresponding to
+    the computations of the parameters of the given module,
+    using the corresponding variational parameters in dico,
+    and the rule used to sample epsilons. If the module has
+    submodules, corresponding subcomputational graphs are also
+    built.
+
+    Typically, if a module has a parameter weight, weight should
+    appear in dico, and the parameter will be rebuilt as
+    module.weight = dico['weight'].mean + (1+dico['weight'].rho.exp()).log() *\
+            dico['weight'].eps
+
+    :args dico: a 'tree' dictionnary that contains variational
+    parameters for the current module, and subtrees for submodules
+    :args module: the module whose parameters are to be rebuilt
+    :args epsilon_settings: how epsilons ought to be drawn
+
+    """
+
     for name, p in dico.items():
         if isinstance(p, VariationalParameter):
             if p.eps is None:
                 p = p._replace(eps=Variable(p.mean.data.clone()))
-            if train:
-                p.eps.data.normal_()
-            else:
-                p.eps.data.fill_(0)
+            epsilon_setting(name, p)
             setattr(module, name, p.mean +\
                     (1+p.rho.exp()).log() * p.eps)
         else:
-            rebuild_parameters(p, getattr(module, name), train)
+            rebuild_parameters(p, getattr(module, name), epsilon_setting)
 
 def prior_std(p):
+    """ Compute a reasonable prior standard deviation for parameter p.
+
+    :args p: the parameter
+
+    :return: the resulting std
+
+    """
     stdv = 1
     if p.dim() > 1:
         for i in range(p.dim()-1):
@@ -36,6 +61,12 @@ def prior_std(p):
     return stdv
 
 def sub_prior_loss(dico):
+    """ Compute the KL divergence between prior and parameters for
+    all Variational Parameters in the tree dictionary dico.
+
+    :args dico: tree dictionary
+    :return: KL divergence between prior and current
+    """
     loss = 0
     for name, p in dico.items():
         if isinstance(p, VariationalParameter):
@@ -49,6 +80,15 @@ def sub_prior_loss(dico):
     return loss
 
 class Variationalize(nn.Module):
+    """ Build a Variational model over the model given as input.
+    
+    Variationalize changes all parameters of the given model
+    to allow learning of a gaussian distribution over the
+    parameters using Variational inference. For more information, 
+    see e.g. TODO: REF.
+
+    :args model: the model on which VI is to be performed
+    """
     def __init__(self, model):
         super().__init__()
         self.model = model
@@ -86,8 +126,42 @@ class Variationalize(nn.Module):
             dico[mname] = sub_dico
 
     def forward(self, *input):
-        rebuild_parameters(self.dico, self.model, self.training)
+        epsilon_setting = \
+                lambda name, p: p.eps.data.normal_() if self.training else\
+                lambda name, p: p.eps.data.zero_()
+        rebuild_parameters(self.dico, self.model, epsilon_setting)
         return self.model(*input)
 
     def prior_loss(self):
         return sub_prior_loss(self.dico)
+
+class Sample(nn.Module):
+    """ Utility to sample a single model from a Variational Model.
+
+    Sample is a decorator that wraps a variational model, sample
+    a model from the current parameter distribution and make the
+    model usable as any other pytorch model. The sample can be
+    redrawn using the draw() method. Draw needs to be called
+    once before the model can be used.
+
+    :args var_model: Variational model from which the sample models
+    are to be drawn
+    """
+    def __init__(self, var_model):
+        super().__init__()
+        self.var_model = var_model
+
+        self.sample_dico = OrderedDict()
+
+    def draw():
+        for name, p in self.var_model.dico.items():
+            if name in self.sample_dico:
+                self.sample_dico[name].normal_()
+            else:
+                self.sample_dico[name] = p.eps.data.clone().normal_()
+
+    def forward(self, *input):
+        epsilon_setting = \
+                lambda name, p: p.eps.data.copy(self.sample_dico[name])
+        rebuild_parameters(self.var_model.dico, self.var_model, epsilon_setting)
+        return self.var_model.model(*input)
