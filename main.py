@@ -4,10 +4,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+
 from torchvision import datasets, transforms
 from torch.autograd import Variable
-
-from VIModule import VILinear
+from VI import Variationalize
 
 # Training settings
 parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
@@ -54,36 +54,35 @@ test_loader = torch.utils.data.DataLoader(
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.fc1 = VILinear(784, 256)
-        self.fc2 = VILinear(256, 256)
-        self.fc3 = VILinear(256, 256)
-        self.fc4 = VILinear(256, 10)
+        self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
+        self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
+        self.fc1 = nn.Linear(320, 50)
+        self.fc2 = nn.Linear(50, 10)
 
     def forward(self, x):
-        x = F.relu(self.fc1(x.view(-1, 784)))
-        x = F.relu(self.fc2(x))
-        x = F.relu(self.fc3(x))
-        x = self.fc4(x)
+        x = F.relu(F.max_pool2d(self.conv1(x), 2))
+        x = F.relu(F.max_pool2d(self.conv2(x), 2))
+        x = x.view(-1, 320)
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
         return F.log_softmax(x)
 
-    def kl_loss(self):
-        return self.fc1.kl_loss() + self.fc2.kl_loss() + self.fc3.kl_loss()
-
 model = Net()
+var_model = Variationalize(model)
 if args.cuda:
-    model.cuda()
+    var_model.cuda()
 
-optimizer = optim.Adam(model.parameters(), lr=args.lr)
+optimizer = optim.Adam(var_model.parameters(), lr=args.lr)
 
 def train(epoch):
-    model.train()
+    var_model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
         if args.cuda:
             data, target = data.cuda(), target.cuda()
         data, target = Variable(data), Variable(target)
         optimizer.zero_grad()
-        output = model(data)
-        loss = F.nll_loss(output, target) + 1/60000*model.kl_loss()
+        output = var_model(data)
+        loss = F.nll_loss(output, target) + var_model.prior_loss() / 60000
         loss.backward()
         optimizer.step()
         if batch_idx % args.log_interval == 0:
@@ -92,14 +91,14 @@ def train(epoch):
                 100. * batch_idx / len(train_loader), loss.data[0]))
 
 def test(epoch):
-    model.eval()
+    var_model.eval()
     test_loss = 0
     correct = 0
     for data, target in test_loader:
         if args.cuda:
             data, target = data.cuda(), target.cuda()
         data, target = Variable(data, volatile=True), Variable(target)
-        output = model(data)
+        output = var_model(data)
         test_loss += F.nll_loss(output, target).data[0]
         pred = output.data.max(1)[1] # get the index of the max log-probability
         correct += pred.eq(target.data).cpu().sum()
