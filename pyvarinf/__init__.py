@@ -1,1 +1,1 @@
-from .vi import joke
+from .vi import Variationalize

@@ -1,5 +1,6 @@
 from __future__ import print_function
 import argparse
+import pyvarinf
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -7,7 +8,6 @@ import torch.optim as optim
 
 from torchvision import datasets, transforms
 from torch.autograd import Variable
-from VI import Variationalize
 
 # Training settings
 parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
@@ -68,7 +68,7 @@ class Net(nn.Module):
         return F.log_softmax(x)
 
 model = Net()
-var_model = Variationalize(model)
+var_model = pyvarinf.Variationalize(model)
 if args.cuda:
     var_model.cuda()
 
