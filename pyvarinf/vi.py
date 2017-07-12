@@ -40,6 +40,8 @@ def rebuild_parameters(dico, module, epsilon_setting):
             epsilon_setting(name, p)
             setattr(module, name, p.mean +\
                     (1+p.rho.exp()).log() * p.eps)
+        elif p is None:
+            setattr(module, name, None)
         else:
             rebuild_parameters(p, getattr(module, name), epsilon_setting)
 
@@ -99,18 +101,21 @@ class Variationalize(nn.Module):
     def variationalize_module(self, dico, module, prefix):
         to_erase = []
         for name, p in module._parameters.items():
-            stdv = prior_std(p)
-            init_rho = math.log(math.exp(stdv) - 1)
+            if p is None:
+                dico[name] = None
+            else:
+                stdv = prior_std(p)
+                init_rho = math.log(math.exp(stdv) - 1)
 
-            dico[name] = VariationalParameter(
-                Parameter(p.data.clone().fill_(0)),
-                Parameter(p.data.clone().fill_(init_rho)),
-                None)
+                dico[name] = VariationalParameter(
+                    Parameter(p.data.clone().fill_(0)),
+                    Parameter(p.data.clone().fill_(init_rho)),
+                    None)
 
-            self.register_parameter(prefix + '.' + name + '_mean',
-                                   dico[name].mean)
-            self.register_parameter(prefix + '.' + name + '_rho',
-                                   dico[name].rho)
+                self.register_parameter(prefix + '.' + name + '_mean',
+                                       dico[name].mean)
+                self.register_parameter(prefix + '.' + name + '_rho',
+                                       dico[name].rho)
 
 
             to_erase.append(name)
@@ -153,15 +158,17 @@ class Sample(nn.Module):
 
         self.sample_dico = OrderedDict()
 
-    def draw():
+    def draw(self):
         for name, p in self.var_model.dico.items():
             if name in self.sample_dico:
                 self.sample_dico[name].normal_()
             else:
+                if p.eps is None:
+                    p = p._replace(eps=Variable(p.mean.data.clone()))
                 self.sample_dico[name] = p.eps.data.clone().normal_()
 
     def forward(self, *input):
         epsilon_setting = \
-                lambda name, p: p.eps.data.copy(self.sample_dico[name])
-        rebuild_parameters(self.var_model.dico, self.var_model, epsilon_setting)
+                lambda name, p: p.eps.data.copy_(self.sample_dico[name])
+        rebuild_parameters(self.var_model.dico, self.var_model.model, epsilon_setting)
         return self.var_model.model(*input)
