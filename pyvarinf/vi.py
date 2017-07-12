@@ -36,10 +36,10 @@ def rebuild_parameters(dico, module, epsilon_setting):
     for name, p in dico.items():
         if isinstance(p, VariationalParameter):
             if p.eps is None:
-                p = p._replace(eps=Variable(p.mean.data.clone()))
-            epsilon_setting(name, p)
-            setattr(module, name, p.mean +\
-                    (1+p.rho.exp()).log() * p.eps)
+                dico[name] = p._replace(eps=Variable(p.mean.data.clone()))
+            epsilon_setting(name, dico[name])
+            setattr(module, name, dico[name].mean +\
+                    (1+p.rho.exp()).log() * dico[name].eps)
         elif p is None:
             setattr(module, name, None)
         else:
@@ -156,19 +156,26 @@ class Sample(nn.Module):
         super().__init__()
         self.var_model = var_model
 
-        self.sample_dico = OrderedDict()
+        self.association = []
 
-    def draw(self):
-        for name, p in self.var_model.dico.items():
-            if name in self.sample_dico:
-                self.sample_dico[name].normal_()
-            else:
+    def draw(self, association=None, var_dico=None):
+        if association is None:
+            self.association = []
+            association = self.association
+            var_dico = self.var_model.dico
+
+        for name, p in var_dico.items():
+            if isinstance(p, VariationalParameter):
                 if p.eps is None:
-                    p = p._replace(eps=Variable(p.mean.data.clone()))
-                self.sample_dico[name] = p.eps.data.clone().normal_()
+                    var_dico[name] = p._replace(eps=Variable(p.mean.data.clone()))
+                association.append((var_dico[name].eps, var_dico[name].eps.data.clone().normal_()))
+            else:
+                self.draw(association, p)
 
     def forward(self, *input):
+        for p, drawn_value_p in self.association:
+            p.data.copy_(drawn_value_p)
         epsilon_setting = \
-                lambda name, p: p.eps.data.copy_(self.sample_dico[name])
+                lambda name, p: 1
         rebuild_parameters(self.var_model.dico, self.var_model.model, epsilon_setting)
         return self.var_model.model(*input)
