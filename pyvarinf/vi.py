@@ -1,3 +1,4 @@
+# pylint: disable=too-many-arguments, too-many-locals
 """ Variational inference """
 import math
 from collections import namedtuple
@@ -94,15 +95,21 @@ class Variationalize(nn.Module):
     see e.g. TODO: REF.
 
     :args model: the model on which VI is to be performed
+    :args zero_mean: if True, sets initial mean to 0, else
+        keep model initial mean
+    :args learn_mean: if True, learn the posterior mean
+    :args learn_rho: if True, learn the posterior rho
     """
-    def __init__(self, model):
+    def __init__(self, model, zero_mean=True, learn_mean=True, learn_rho=True):
         super().__init__()
         self.model = model
 
         self.dico = OrderedDict()
-        self._variationalize_module(self.dico, self.model, '')
+        self._variationalize_module(self.dico, self.model, '', zero_mean,
+                                    learn_mean, learn_rho)
 
-    def _variationalize_module(self, dico, module, prefix):
+    def _variationalize_module(self, dico, module, prefix, zero_mean,
+                               learn_mean, learn_rho):
         to_erase = []
         for name, p in module._parameters.items():  # pylint: disable=protected-access, line-too-long
             if p is None:
@@ -111,15 +118,21 @@ class Variationalize(nn.Module):
                 stdv = prior_std(p)
                 init_rho = math.log(math.exp(stdv) - 1)
 
+                init_mean = p.data.clone()
+                if zero_mean:
+                    init_mean.fill_(0)
+
                 dico[name] = VariationalParameter(
-                    Parameter(p.data.clone().fill_(0)),
+                    Parameter(init_mean),
                     Parameter(p.data.clone().fill_(init_rho)),
                     None)
 
-                self.register_parameter(prefix + '.' + name + '_mean',
-                                        dico[name].mean)
-                self.register_parameter(prefix + '.' + name + '_rho',
-                                        dico[name].rho)
+                if learn_mean:
+                    self.register_parameter(prefix + '.' + name + '_mean',
+                                            dico[name].mean)
+                if learn_rho:
+                    self.register_parameter(prefix + '.' + name + '_rho',
+                                            dico[name].rho)
 
             to_erase.append(name)
 
@@ -130,7 +143,8 @@ class Variationalize(nn.Module):
             sub_dico = OrderedDict()
             self._variationalize_module(sub_dico, sub_module,
                                         prefix + ('.' if prefix else '') +
-                                        mname)
+                                        mname, zero_mean,
+                                        learn_mean, learn_rho)
             dico[mname] = sub_dico
 
     def forward(self, *inputs):

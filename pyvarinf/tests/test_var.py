@@ -64,3 +64,41 @@ class TestVar(TestCase):
         out1 = var_model(x)
         out2 = var_model(x)
         self.assertTrue(out1.eq(out2).float().norm().data[0] == 0)
+
+    def test_no_learn(self):
+        """ Test no learning parameters """
+        x = Variable(torch.Tensor(1, 10).fill_(2))
+        dx = Variable(torch.Tensor(1, 10).fill_(2))
+        model = nn.Linear(10, 10)
+        var_model = pyvarinf.Variationalize(model, zero_mean=True,
+                                            learn_mean=False, learn_rho=True)
+        for p in var_model.parameters():
+            self.assertTrue(p.grad is None)
+        out = var_model(x)
+        out.backward(dx)
+        for p in var_model.parameters():
+            self.assertTrue((p.grad.abs().sum() > 0).data[0])
+
+        x = Variable(torch.Tensor(1, 10).fill_(2))
+        dx = Variable(torch.Tensor(1, 10).fill_(2))
+        model = nn.Linear(10, 10)
+        var_model = pyvarinf.Variationalize(model, zero_mean=True,
+                                            learn_mean=True, learn_rho=False)
+        for p in var_model.parameters():
+            self.assertTrue(p.grad is None)
+        out = var_model(x)
+        out.backward(dx)
+        for p in var_model.parameters():
+            self.assertTrue((p.grad.abs().sum() > 0).data[0])
+
+        x = Variable(torch.Tensor(1, 10).fill_(2))
+        dx = Variable(torch.Tensor(1, 10).fill_(2))
+        model = nn.Linear(10, 10)
+        var_model = pyvarinf.Variationalize(model, zero_mean=False,
+                                            learn_mean=True, learn_rho=False)
+        for p in var_model.parameters():
+            self.assertTrue(p.grad is None)
+        out = var_model(x)
+        out.backward(dx)
+        for p in var_model.parameters():
+            self.assertTrue((p.grad.abs().sum() > 0).data[0])
