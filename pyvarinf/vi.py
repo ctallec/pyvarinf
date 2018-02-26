@@ -3,6 +3,8 @@
 import math
 from collections import namedtuple
 from collections import OrderedDict
+from scipy.special import gammaln
+import numpy as np
 
 import torch.nn as nn
 from torch.autograd import Variable
@@ -85,6 +87,74 @@ def sub_prior_loss(dico):
             loss += sub_prior_loss(p)
     return loss
 
+def sub_conjprior_loss(dico, module, alpha_0, beta_0, mu_0, kappa_0):
+    """ Compute an estimation of the KL divergence between the conjugate
+    prior and parameters for all Variational Parameters in the tree
+    dictionary dico.
+
+    :args dico: tree dictionary
+    :args module: the module whose KL will be computed
+    :args alpha_0: hyperparameter of the conjugate prior
+    :args beta_0: hyperparameter of the conjugate prior
+    :args mu_0: hyperparameter of the conjugate prior
+    :args kappa_0: hyperparameter of the conjugate prior
+    :return: estimation of the KL divergence between prior and current
+    """
+    logprior = 0.
+    for name, p in dico.items():
+        if isinstance(p, VariationalParameter):
+            theta = getattr(module, name)
+            S = (theta.mean() - mu_0).norm() ** 2
+            V = (theta - theta.mean()).norm() ** 2
+            n = np.prod(theta.size())
+            alpha_n = alpha_0 + n/2
+            kappa_n = kappa_0+n
+            beta_n = beta_0 + V/2 + S * (kappa_0*n)/(2 * kappa_n)
+            logprior -= - beta_n.log() * alpha_n + alpha_0 * np.log(beta_0) + \
+                gammaln(alpha_n) - gammaln(alpha_0) + \
+                .5 * np.log(kappa_0/kappa_n) - .5 * n * np.log(2*np.pi)
+            std = (1+p.rho.exp()).log()
+            H = std.log().sum() + .5 * n * (1 + np.log(2*np.pi))
+            logprior -= H
+        else:
+            logprior += sub_conjprior_loss(\
+                p, getattr(module, name), alpha_0, beta_0, mu_0, kappa_0)
+    return logprior
+
+
+def sub_conjpriorknownmean_loss(dico, module, mean, alpha_0, beta_0):
+    """ Compute an estimation of the KL divergence between the conjugate
+    prior when the mean is known and parameters for all Variational
+    Parameters in the tree dictionary dico.
+
+    :args dico: tree dictionary
+    :args module: the module whose KL will be computed
+    :args mean: known mean for the conjugate prior
+    :args alpha_0: hyperparameter of the conjugate prior
+    :args beta_0: hyperparameter of the conjugate prior
+    :args mu_0: hyperparameter of the conjugate prior
+    :args kappa_0: hyperparameter of the conjugate prior
+    :return: estimation of the KL divergence between prior and current
+    """
+    logprior = 0.
+    for name, p in dico.items():
+        if isinstance(p, VariationalParameter):
+            theta = getattr(module, name)
+            S = (theta - mean).norm() ** 2
+            n = np.prod(theta.size())
+            alpha_n = alpha_0 + n/2
+            beta_n = beta_0 + S/2
+            logprior -= - beta_n.log() * alpha_n + \
+                gammaln(alpha_n) - gammaln(alpha_0) + \
+                alpha_0 * np.log(beta_0) - .5 * n * np.log(2*np.pi)
+            std = (1+p.rho.exp()).log()
+            H = std.log().sum() + .5 * n * (1 + np.log(2*np.pi))
+            logprior -= H
+        else:
+            logprior += sub_conjpriorknownmean_loss(\
+                p, getattr(module, name), mean, alpha_0, beta_0)
+    return logprior
+
 
 class Variationalize(nn.Module):
     """ Build a Variational model over the model given as input.
@@ -151,7 +221,7 @@ class Variationalize(nn.Module):
         def _epsilon_setting(name, p):  # pylint: disable=unused-argument
             if self.training:
                 return p.eps.data.normal_()
-            return p.eps_data.zero_()
+            return p.eps.data.zero_()
 
         rebuild_parameters(self.dico, self.model, _epsilon_setting)
         return self.model(*inputs)
@@ -159,6 +229,15 @@ class Variationalize(nn.Module):
     def prior_loss(self):
         """ Returns the prior loss """
         return sub_prior_loss(self.dico)
+
+    def conjprior_loss(self, alpha_0=.5, beta_0=.5, mu_0=0, kappa_0=1.):
+        return sub_conjprior_loss(self.dico, self.model, alpha_0,
+                                  beta_0, mu_0, kappa_0)
+
+    def conjpriorknownmean_loss(self, mean=0., alpha_0=.5, beta_0=.5):
+        return sub_conjpriorknownmean_loss(self.dico, self.model, mean,
+                                           alpha_0, beta_0)
+
 
 
 class Sample(nn.Module):
