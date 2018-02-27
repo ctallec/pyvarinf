@@ -275,19 +275,28 @@ class Variationalize(nn.Module):
         specify the corresponding parameter:
           - For the gaussian prior, no parameter is required.
           - For the conjugate prior, you must specify
+            - n_mc_samples, the number of samples used in the Monte Carlo
+              estimation of the prior loss and its gradient.
             - mu_0, the prior sample mean
             - kappa_0, the number of samples used to estimate the
               prior sample mean
             - alpha_0 and beta_0, such that variance was estimated from 2
              alpha_0 observations with sample mean mu_0 and sum of squared
              deviations 2 beta_0
-          - For the conjugate prior with known variance,
+          - For the conjugate prior with known mean,
+            - n_mc_samples, the number of samples used in the Monte Carlo
+              estimation of the prior loss and its gradient.
             - alpha_0 and beta_0 defined as above
+          - For the mixture of two gaussians,
+            - n_mc_samples, the number of samples used in the Monte Carlo
+              estimation of the prior loss and its gradient.
+            - sigma_1 and sigma_2 the std of the two gaussians
+            - pi the probability of the first gaussian
         For further information, see:
             https://en.wikipedia.org/wiki/Conjugate_prior.
         Acts inplace by modifying the value of _prior_loss_function
         :args prior_type: one of 'gaussian', 'conjugate',
-            'conjugate_known_mean'
+            'conjugate_known_mean', 'mixtgauss'
         :args prior_parameters: the parameters for the associated prior
         """
         if prior_type == 'gaussian':
