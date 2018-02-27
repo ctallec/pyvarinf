@@ -74,9 +74,8 @@ if args.cuda:
 
 optimizer = optim.Adam(var_model.parameters(), lr=args.lr)
 
-#var_model.set_prior('conjugate_known_mean', n_mc_samples=1, mean=0., alpha_0=.5, beta_0=.5)
-var_model.set_prior('mixtgauss', n_mc_samples=2, sigma_1=1/2**1, 
-                            sigma_2=1/2**6, pi=1/2)
+
+
 def train(epoch):
     var_model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
