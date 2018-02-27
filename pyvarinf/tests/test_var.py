@@ -103,22 +103,37 @@ class TestVar(TestCase):
         for p in var_model.parameters():
             self.assertTrue((p.grad.abs().sum() > 0).data[0])
 
-    def test_conj(self):
-        """ Test conjugate priors """
+    def test_mixtgauss(self):
+        """Test mixt gauss prior"""
         x = Variable(torch.Tensor(1, 10).fill_(2))
         model = nn.Linear(10, 10)
         var_model = pyvarinf.Variationalize(model)
-        var_model.set_prior('conjugate', alpha_0=.5, beta_0=.5,
-                            mu_0=.5, kappa_0=.5)
+        var_model.set_prior('mixtgauss', n_mc_samples=2, sigma_1=1/2**1, 
+                            sigma_2=1/2**6, pi=1/2)
+        var_model(x)
+        prior_loss = var_model.prior_loss()
+        prior_loss.backward()
+        
+    def test_conj(self):
+        """ Test conjugate prior """
+        x = Variable(torch.Tensor(1, 10).fill_(2))
+        model = nn.Linear(10, 10)
+        var_model = pyvarinf.Variationalize(model)
+        var_model.set_prior('conjugate', n_mc_samples=2, alpha_0=.5, 
+                            beta_0=.5, mu_0=.5, kappa_0=.5)
         var_model(x)
         prior_loss = var_model.prior_loss()
         prior_loss.backward()
 
+    def test_conjknownmean(self):
+        """Test conjugate prior with known mean"""
         x = Variable(torch.Tensor(1, 10).fill_(2))
         model = nn.Linear(10, 10)
         var_model = pyvarinf.Variationalize(model)
-        var_model.set_prior('conjugate_known_mean', alpha_0=.5, beta_0=.5,
-                            mean=0.)
+        var_model.set_prior('conjugate_known_mean', n_mc_samples=2, 
+                            alpha_0=.5, beta_0=.5, mean=0.)
         var_model(x)
         prior_loss = var_model.prior_loss()
         prior_loss.backward()
+        
+        

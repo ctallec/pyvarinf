@@ -100,14 +100,28 @@ def sub_prior_loss(dico):
             loss += sub_prior_loss(p)
     return loss
 
+def sub_entropy(dico):
+    """ Compute the entropy of the parameters for all Variational
+    Parameters in the tree dictionary dico.
+    :args dico: tree dictionary
+    :returns: Entropy of the current distribution
+    """
+    entropy = 0.
+    for _, p in dico.items():
+        if isinstance(p, VariationalParameter):
+            std = (1+p.rho.exp()).log()
+            n = np.prod(std.size())
+            entropy += std.log().sum() + .5 * n * (1 + np.log(2*np.pi))
+        else:
+            entropy += sub_entropy(p)
+    return entropy
 
-def sub_conjprior_loss(dico, alpha_0, beta_0, mu_0, kappa_0):
+def sub_conjprior(dico, alpha_0, beta_0, mu_0, kappa_0):
     """ Compute an estimation of the KL divergence between the conjugate
     prior and parameters for all Variational Parameters in the tree
     dictionary dico.
 
     :args dico: tree dictionary
-    :args module: the module whose KL will be computed
     :args alpha_0: hyperparameter of the conjugate prior
     :args beta_0: hyperparameter of the conjugate prior
     :args mu_0: hyperparameter of the conjugate prior
@@ -124,30 +138,25 @@ def sub_conjprior_loss(dico, alpha_0, beta_0, mu_0, kappa_0):
             alpha_n = alpha_0 + n/2
             kappa_n = kappa_0+n
             beta_n = beta_0 + V/2 + S * (kappa_0*n)/(2 * kappa_n)
-            logprior -= - beta_n.log() * alpha_n + alpha_0 * np.log(beta_0) + \
+            logprior += - beta_n.log() * alpha_n + alpha_0 * np.log(beta_0) + \
                 gammaln(alpha_n) - gammaln(alpha_0) + \
                 .5 * np.log(kappa_0/kappa_n) - .5 * n * np.log(2*np.pi)
-            std = (1+p.rho.exp()).log()
-            H = std.log().sum() + .5 * n * (1 + np.log(2*np.pi))
-            logprior -= H
+
         else:
-            logprior += sub_conjprior_loss(
+            logprior += sub_conjprior(
                 p, alpha_0, beta_0, mu_0, kappa_0)
     return logprior
 
 
-def sub_conjpriorknownmean_loss(dico, mean, alpha_0, beta_0):
+def sub_conjpriorknownmean(dico, mean, alpha_0, beta_0):
     """ Compute an estimation of the KL divergence between the conjugate
     prior when the mean is known and parameters for all Variational
     Parameters in the tree dictionary dico.
 
     :args dico: tree dictionary
-    :args module: the module whose KL will be computed
     :args mean: known mean for the conjugate prior
     :args alpha_0: hyperparameter of the conjugate prior
     :args beta_0: hyperparameter of the conjugate prior
-    :args mu_0: hyperparameter of the conjugate prior
-    :args kappa_0: hyperparameter of the conjugate prior
     :return: estimation of the KL divergence between prior and current
     """
     logprior = 0.
@@ -158,17 +167,42 @@ def sub_conjpriorknownmean_loss(dico, mean, alpha_0, beta_0):
             n = np.prod(theta.size())
             alpha_n = alpha_0 + n/2
             beta_n = beta_0 + S/2
-            logprior -= - beta_n.log() * alpha_n + \
+            logprior += - beta_n.log() * alpha_n + \
                 gammaln(alpha_n) - gammaln(alpha_0) + \
                 alpha_0 * np.log(beta_0) - .5 * n * np.log(2*np.pi)
-            std = (1+p.rho.exp()).log()
-            H = std.log().sum() + .5 * n * (1 + np.log(2*np.pi))
-            logprior -= H
         else:
-            logprior += sub_conjpriorknownmean_loss(
+            logprior += sub_conjpriorknownmean(
                 p, mean, alpha_0, beta_0)
     return logprior
 
+def sub_mixtgaussprior(dico, sigma_1, sigma_2, pi):
+    """ Compute an estimation of the KL divergence between the prior
+    defined by the mixture of two gaussian distributions
+    for all Variational Parameters in the tree dictionary dico.
+    More details on this prior and the notations can be found in :
+    "Weight Uncertainty in Neural Networks" Blundell et al, 2015
+    https://arxiv.org/pdf/1505.05424.pdf
+
+    :args dico: tree dictionary
+    :args sigma_1: std of the first gaussian in the mixture
+    :args sigma_2: std of the second gaussian in the mixture
+    :args pi: probability of the first gaussian in the mixture
+    :return: estimation of the KL divergence between prior and current
+    """
+    logprior = 0.
+    for _, p in dico.items():
+        if isinstance(p, VariationalParameter):
+            theta = evaluate(p)
+            n = np.prod(theta.size())
+            theta2 = theta ** 2
+            pgauss1 = (- theta2 / sigma_1 ** 2).exp() / sigma_1
+            pgauss2 = (- theta2 / sigma_2 ** 2).exp() / sigma_2
+            logprior += (pi * pgauss1 + (1-pi) * pgauss2).log().sum()
+            logprior -= n/2 * np.log(2*np.pi)
+        else:
+            logprior += sub_mixtgaussprior(
+                p, sigma_1, sigma_2, pi)
+    return logprior
 
 class Variationalize(nn.Module):
     """ Build a Variational model over the model given as input.
@@ -258,16 +292,42 @@ class Variationalize(nn.Module):
         """
         if prior_type == 'gaussian':
             self._prior_loss_function = sub_prior_loss
-        if prior_type == 'conjugate':
-            self._prior_loss_function = functools.partial(
-                sub_conjprior_loss,
-                **prior_parameters
-            )
-        if prior_type == 'conjugate_known_mean':
-            self._prior_loss_function = functools.partial(
-                sub_conjpriorknownmean_loss,
-                **prior_parameters
-            )
+        else:
+            #def _epsilon_setting(name, p):  # pylint: disable=unused-argument
+            #    return p.eps.data.normal_()
+            n_mc_samples = prior_parameters.pop("n_mc_samples")
+            if prior_type == 'conjugate':
+                mc_logprior_function = functools.partial(
+                    sub_conjprior,
+                    **prior_parameters
+                )
+            if prior_type == 'conjugate_known_mean':
+                mc_logprior_function = functools.partial(
+                    sub_conjpriorknownmean,
+                    **prior_parameters
+                )
+            if prior_type == 'mixtgauss':
+                mc_logprior_function = functools.partial(
+                    sub_mixtgaussprior,
+                    **prior_parameters
+                )
+
+            def prior_loss_function(dico):
+                """Compute the prior loss"""
+                # TODO refactoring, dico is not used
+                logprior = 0.
+                for _ in range(n_mc_samples):
+                    rebuild_parameters(
+                        self.dico, self.model,
+                        lambda name, p: p.eps.data.normal_()
+                    )
+                    logprior += mc_logprior_function(self.dico)
+                logprior = logprior / n_mc_samples
+                H = sub_entropy(self.dico)
+                prior_loss = - logprior - H
+                return prior_loss
+            self._prior_loss_function = prior_loss_function
+
 
     def forward(self, *inputs):
         def _epsilon_setting(name, p):  # pylint: disable=unused-argument

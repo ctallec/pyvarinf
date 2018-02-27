@@ -74,6 +74,9 @@ if args.cuda:
 
 optimizer = optim.Adam(var_model.parameters(), lr=args.lr)
 
+#var_model.set_prior('conjugate_known_mean', n_mc_samples=1, mean=0., alpha_0=.5, beta_0=.5)
+var_model.set_prior('mixtgauss', n_mc_samples=2, sigma_1=1/2**1, 
+                            sigma_2=1/2**6, pi=1/2)
 def train(epoch):
     var_model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
@@ -82,13 +85,15 @@ def train(epoch):
         data, target = Variable(data), Variable(target)
         optimizer.zero_grad()
         output = var_model(data)
-        loss = F.nll_loss(output, target) + var_model.prior_loss() / 60000
+        loss_error = F.nll_loss(output, target)
+        loss_prior = var_model.prior_loss() / 60000
+        loss = loss_error + loss_prior
         loss.backward()
         optimizer.step()
         if batch_idx % args.log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tLoss error: {:.6f}\tLoss weights: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.data[0]))
+                100. * batch_idx / len(train_loader), loss.data[0], loss_error.data[0], loss_prior.data[0]))
 
 def test(epoch):
     var_model.eval()
