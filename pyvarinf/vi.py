@@ -198,8 +198,8 @@ def sub_mixtgaussprior(dico, sigma_1, sigma_2, pi):
             theta = evaluate(p)
             n = np.prod(theta.size())
             theta2 = theta ** 2
-            pgauss1 = (- theta2 / sigma_1 ** 2).exp() / sigma_1
-            pgauss2 = (- theta2 / sigma_2 ** 2).exp() / sigma_2
+            pgauss1 = (- theta2 / (2. * sigma_1 ** 2)).exp() / sigma_1
+            pgauss2 = (- theta2 / (2. * sigma_2 ** 2)).exp() / sigma_2
             logprior += (pi * pgauss1 + (1 - pi) * pgauss2 + 1e-8).log().sum()
             logprior -= n / 2 * np.log(2 * np.pi)
         else:
