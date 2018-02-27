@@ -236,6 +236,21 @@ class Variationalize(nn.Module):
     def set_prior(self, prior_type, **prior_parameters):
         """ Change the prior to be used.
 
+        Available priors are 'gaussian', 'conjugate' and
+        'conjugate_known_mean'. For each prior, you must
+        specify the corresponding parameter:
+          - For the gaussian prior, no parameter is required.
+          - For the conjugate prior, you must specify
+            - mu_0, the prior sample mean
+            - kappa_0, the number of samples used to estimate the
+              prior sample mean
+            - alpha_0 and beta_0, such that variance was estimated from 2
+             alpha_0 observations with sample mean mu_0 and sum of squared
+             deviations 2 beta_0
+          - For the conjugate prior with known variance,
+            - alpha_0 and beta_0 defined as above
+        For further information, see:
+            https://en.wikipedia.org/wiki/Conjugate_prior.
         Acts inplace by modifying the value of _prior_loss_function
         :args prior_type: one of 'gaussian', 'conjugate',
             'conjugate_known_mean'

@@ -113,3 +113,12 @@ class TestVar(TestCase):
         var_model(x)
         prior_loss = var_model.prior_loss()
         prior_loss.backward()
+
+        x = Variable(torch.Tensor(1, 10).fill_(2))
+        model = nn.Linear(10, 10)
+        var_model = pyvarinf.Variationalize(model)
+        var_model.set_prior('conjugate_known_mean', alpha_0=.5, beta_0=.5,
+                            mean=0.)
+        var_model(x)
+        prior_loss = var_model.prior_loss()
+        prior_loss.backward()
