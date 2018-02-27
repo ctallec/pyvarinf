@@ -100,6 +100,7 @@ def sub_prior_loss(dico):
             loss += sub_prior_loss(p)
     return loss
 
+
 def sub_entropy(dico):
     """ Compute the entropy of the parameters for all Variational
     Parameters in the tree dictionary dico.
@@ -115,6 +116,7 @@ def sub_entropy(dico):
         else:
             entropy += sub_entropy(p)
     return entropy
+
 
 def sub_conjprior(dico, alpha_0, beta_0, mu_0, kappa_0):
     """ Compute an estimation of the KL divergence between the conjugate
@@ -175,6 +177,7 @@ def sub_conjpriorknownmean(dico, mean, alpha_0, beta_0):
                 p, mean, alpha_0, beta_0)
     return logprior
 
+
 def sub_mixtgaussprior(dico, sigma_1, sigma_2, pi):
     """ Compute an estimation of the KL divergence between the prior
     defined by the mixture of two gaussian distributions
@@ -203,6 +206,7 @@ def sub_mixtgaussprior(dico, sigma_1, sigma_2, pi):
             logprior += sub_mixtgaussprior(
                 p, sigma_1, sigma_2, pi)
     return logprior
+
 
 class Variationalize(nn.Module):
     """ Build a Variational model over the model given as input.
@@ -293,8 +297,6 @@ class Variationalize(nn.Module):
         if prior_type == 'gaussian':
             self._prior_loss_function = sub_prior_loss
         else:
-            #def _epsilon_setting(name, p):  # pylint: disable=unused-argument
-            #    return p.eps.data.normal_()
             n_mc_samples = prior_parameters.pop("n_mc_samples")
             if prior_type == 'conjugate':
                 mc_logprior_function = functools.partial(
@@ -312,9 +314,8 @@ class Variationalize(nn.Module):
                     **prior_parameters
                 )
 
-            def prior_loss_function(dico):
+            def prior_loss_function():
                 """Compute the prior loss"""
-                # TODO refactoring, dico is not used
                 logprior = 0.
                 for _ in range(n_mc_samples):
                     rebuild_parameters(
@@ -328,7 +329,6 @@ class Variationalize(nn.Module):
                 return prior_loss
             self._prior_loss_function = prior_loss_function
 
-
     def forward(self, *inputs):
         def _epsilon_setting(name, p):  # pylint: disable=unused-argument
             if self.training:
@@ -340,7 +340,7 @@ class Variationalize(nn.Module):
 
     def prior_loss(self):
         """ Returns the prior loss """
-        return self._prior_loss_function(self.dico)
+        return self._prior_loss_function()
 
 
 class Sample(nn.Module):
