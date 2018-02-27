@@ -72,8 +72,8 @@ def prior_std(p):
     """
     stdv = 1
     if p.dim() > 1:
-        for i in range(p.dim()-1):
-            stdv = stdv * p.size()[i+1]
+        for i in range(p.dim() - 1):
+            stdv = stdv * p.size()[i + 1]
         stdv = 1 / math.sqrt(stdv)
     else:
         stdv = 1e-2
@@ -91,11 +91,11 @@ def sub_prior_loss(dico):
     for p in dico.values():
         if isinstance(p, VariationalParameter):
             mean = p.mean
-            std = (1+p.rho.exp()).log()
+            std = (1 + p.rho.exp()).log()
             std_prior = prior_std(mean)
-            loss += (-(std/std_prior).log() +
+            loss += (-(std / std_prior).log() +
                      (std.pow(2) + mean.pow(2)) /
-                     (2 * std_prior ** 2) - 1/2).sum()
+                     (2 * std_prior ** 2) - 1 / 2).sum()
         else:
             loss += sub_prior_loss(p)
     return loss
@@ -110,9 +110,9 @@ def sub_entropy(dico):
     entropy = 0.
     for _, p in dico.items():
         if isinstance(p, VariationalParameter):
-            std = (1+p.rho.exp()).log()
+            std = (1 + p.rho.exp()).log()
             n = np.prod(std.size())
-            entropy += std.log().sum() + .5 * n * (1 + np.log(2*np.pi))
+            entropy += std.log().sum() + .5 * n * (1 + np.log(2 * np.pi))
         else:
             entropy += sub_entropy(p)
     return entropy
@@ -137,12 +137,12 @@ def sub_conjprior(dico, alpha_0, beta_0, mu_0, kappa_0):
             S = (theta.mean() - mu_0).norm() ** 2
             V = (theta - theta.mean()).norm() ** 2
             n = np.prod(theta.size())
-            alpha_n = alpha_0 + n/2
-            kappa_n = kappa_0+n
-            beta_n = beta_0 + V/2 + S * (kappa_0*n)/(2 * kappa_n)
+            alpha_n = alpha_0 + n / 2
+            kappa_n = kappa_0 + n
+            beta_n = beta_0 + V / 2 + S * (kappa_0 * n) / (2 * kappa_n)
             logprior += - beta_n.log() * alpha_n + alpha_0 * np.log(beta_0) + \
                 gammaln(alpha_n) - gammaln(alpha_0) + \
-                .5 * np.log(kappa_0/kappa_n) - .5 * n * np.log(2*np.pi)
+                .5 * np.log(kappa_0 / kappa_n) - .5 * n * np.log(2 * np.pi)
 
         else:
             logprior += sub_conjprior(
@@ -167,11 +167,11 @@ def sub_conjpriorknownmean(dico, mean, alpha_0, beta_0):
             theta = evaluate(p)
             S = (theta - mean).norm() ** 2
             n = np.prod(theta.size())
-            alpha_n = alpha_0 + n/2
-            beta_n = beta_0 + S/2
+            alpha_n = alpha_0 + n / 2
+            beta_n = beta_0 + S / 2
             logprior += - beta_n.log() * alpha_n + \
                 gammaln(alpha_n) - gammaln(alpha_0) + \
-                alpha_0 * np.log(beta_0) - .5 * n * np.log(2*np.pi)
+                alpha_0 * np.log(beta_0) - .5 * n * np.log(2 * np.pi)
         else:
             logprior += sub_conjpriorknownmean(
                 p, mean, alpha_0, beta_0)
@@ -198,10 +198,10 @@ def sub_mixtgaussprior(dico, sigma_1, sigma_2, pi):
             theta = evaluate(p)
             n = np.prod(theta.size())
             theta2 = theta ** 2
-            pgauss1 = (- theta2 / sigma_1 ** 2).exp() / sigma_1
+            pgauss1 = (- theta2 / sigma_1 ** 2).exp() / sigma_k
             pgauss2 = (- theta2 / sigma_2 ** 2).exp() / sigma_2
-            logprior += (pi * pgauss1 + (1-pi) * pgauss2).log().sum()
-            logprior -= n/2 * np.log(2*np.pi)
+            logprior += (pi * pgauss1 + (1 - pi) * pgauss2 + 1e-8).log().sum()
+            logprior -= n / 2 * np.log(2 * np.pi)
         else:
             logprior += sub_mixtgaussprior(
                 p, sigma_1, sigma_2, pi)
@@ -276,7 +276,7 @@ class Variationalize(nn.Module):
     def set_prior(self, prior_type, **prior_parameters):
         """ Change the prior to be used.
 
-        Available priors are 'gaussian', 'conjugate' and
+        Available priors are 'gaussian', 'conjugate', 'mixtgauss' and
         'conjugate_known_mean'. For each prior, you must
         specify the corresponding parameter:
           - For the gaussian prior, no parameter is required.
@@ -292,6 +292,7 @@ class Variationalize(nn.Module):
           - For the conjugate prior with known mean,
             - n_mc_samples, the number of samples used in the Monte Carlo
               estimation of the prior loss and its gradient.
+            - mean, the known mean
             - alpha_0 and beta_0 defined as above
           - For the mixture of two gaussians,
             - n_mc_samples, the number of samples used in the Monte Carlo

@@ -27,8 +27,30 @@ parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
 parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='how many batches to wait before logging training status')
+parser.add_argument('--prior', type=str, default='gaussian', metavar='P',
+                    help='prior used (default: gaussian)',
+                    choices=['gaussian', 'mixtgauss', 'conjugate', 'conjugate_known_mean'])
+
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
+
+# setting up prior parameters
+prior_parameters = {}
+if args.prior != 'gaussian':
+    prior_parameters['n_mc_samples'] = 1
+if args.prior == 'mixtgauss':
+    prior_parameters['sigma_1'] = 0.02
+    prior_parameters['sigma_2'] = 0.2
+    prior_parameters['pi'] = 0.5
+if args.prior == 'conjugate':
+    prior_parameters['mu_0'] = 0.
+    prior_parameters['kappa_0'] = 3.
+    prior_parameters['alpha_0'] = .5
+    prior_parameters['beta_0'] = .5
+if args.prior == 'conjugate_known_mean':
+    prior_parameters['alpha_0'] = .5
+    prior_parameters['beta_0'] = .5
+    prior_parameters['mean'] = 0.
 
 torch.manual_seed(args.seed)
 if args.cuda:
@@ -58,10 +80,12 @@ class Net(nn.Module):
         self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
         self.fc1 = nn.Linear(320, 50)
         self.fc2 = nn.Linear(50, 10)
+        self.bn1 = nn.BatchNorm2d(10)
+        self.bn2 = nn.BatchNorm2d(20)
 
     def forward(self, x):
-        x = F.relu(F.max_pool2d(self.conv1(x), 2))
-        x = F.relu(F.max_pool2d(self.conv2(x), 2))
+        x = self.bn1(F.relu(F.max_pool2d(self.conv1(x), 2)))
+        x = self.bn2(F.relu(F.max_pool2d(self.conv2(x), 2)))
         x = x.view(-1, 320)
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
@@ -69,6 +93,7 @@ class Net(nn.Module):
 
 model = Net()
 var_model = pyvarinf.Variationalize(model)
+var_model.set_prior(args.prior, **prior_parameters)
 if args.cuda:
     var_model.cuda()
 
