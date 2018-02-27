@@ -227,9 +227,11 @@ class Variationalize(nn.Module):
         self.model = model
 
         self.dico = OrderedDict()
-        self._prior_loss_function = sub_prior_loss
         self._variationalize_module(self.dico, self.model, '', zero_mean,
                                     learn_mean, learn_rho)
+        self._prior_loss_function = functools.partial(
+            sub_prior_loss,
+            dico=self.dico)
 
     def _variationalize_module(self, dico, module, prefix, zero_mean,
                                learn_mean, learn_rho):
@@ -304,7 +306,9 @@ class Variationalize(nn.Module):
         :args prior_parameters: the parameters for the associated prior
         """
         if prior_type == 'gaussian':
-            self._prior_loss_function = sub_prior_loss
+            self._prior_loss_function = functools.partial(
+                sub_prior_loss,
+                dico=self.dico)
         else:
             n_mc_samples = prior_parameters.pop("n_mc_samples")
             if prior_type == 'conjugate':
