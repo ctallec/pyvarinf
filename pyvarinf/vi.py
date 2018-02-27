@@ -1,6 +1,7 @@
 # pylint: disable=too-many-arguments, too-many-locals
 """ Variational inference """
 import math
+import functools
 from collections import namedtuple
 from collections import OrderedDict
 from scipy.special import gammaln
@@ -12,6 +13,19 @@ from torch.nn.parameter import Parameter
 
 VariationalParameter = namedtuple('VariationalParameter',
                                   ['mean', 'rho', 'eps'])
+
+
+def evaluate(variational_parameter):
+    """ Evaluates the current value of a variational parameter.
+
+    Returns mean + log(1 + e^rho) * eps
+    :args variational_parameter: the variational parameter
+    :returns: the value of the variational parameter
+    """
+    assert isinstance(variational_parameter, VariationalParameter), \
+        "Incorrect type."
+    return variational_parameter.mean + \
+        (1 + variational_parameter.rho.exp()).log() * variational_parameter.eps
 
 
 def rebuild_parameters(dico, module, epsilon_setting):
@@ -26,7 +40,7 @@ def rebuild_parameters(dico, module, epsilon_setting):
 
     Typically, if a module has a parameter weight, weight should
     appear in dico, and the parameter will be rebuilt as
-    module.weight = dico['weight'].mean + (1+dico['weight'].rho.exp()).log() *\
+    module.weight = dico['weight'].mean + (1+dico['weight'].rho.exp()).log() *
             dico['weight'].eps
 
     :args dico: a 'tree' dictionnary that contains variational
@@ -41,8 +55,7 @@ def rebuild_parameters(dico, module, epsilon_setting):
             if p.eps is None:
                 dico[name] = p._replace(eps=Variable(p.mean.data.clone()))
             epsilon_setting(name, dico[name])
-            setattr(module, name, dico[name].mean +
-                    (1 + p.rho.exp()).log() * dico[name].eps)
+            setattr(module, name, evaluate(dico[name]))
         elif p is None:
             setattr(module, name, None)
         else:
@@ -87,7 +100,8 @@ def sub_prior_loss(dico):
             loss += sub_prior_loss(p)
     return loss
 
-def sub_conjprior_loss(dico, module, alpha_0, beta_0, mu_0, kappa_0):
+
+def sub_conjprior_loss(dico, alpha_0, beta_0, mu_0, kappa_0):
     """ Compute an estimation of the KL divergence between the conjugate
     prior and parameters for all Variational Parameters in the tree
     dictionary dico.
@@ -101,9 +115,9 @@ def sub_conjprior_loss(dico, module, alpha_0, beta_0, mu_0, kappa_0):
     :return: estimation of the KL divergence between prior and current
     """
     logprior = 0.
-    for name, p in dico.items():
+    for _, p in dico.items():
         if isinstance(p, VariationalParameter):
-            theta = getattr(module, name)
+            theta = evaluate(p)
             S = (theta.mean() - mu_0).norm() ** 2
             V = (theta - theta.mean()).norm() ** 2
             n = np.prod(theta.size())
@@ -117,12 +131,12 @@ def sub_conjprior_loss(dico, module, alpha_0, beta_0, mu_0, kappa_0):
             H = std.log().sum() + .5 * n * (1 + np.log(2*np.pi))
             logprior -= H
         else:
-            logprior += sub_conjprior_loss(\
-                p, getattr(module, name), alpha_0, beta_0, mu_0, kappa_0)
+            logprior += sub_conjprior_loss(
+                p, alpha_0, beta_0, mu_0, kappa_0)
     return logprior
 
 
-def sub_conjpriorknownmean_loss(dico, module, mean, alpha_0, beta_0):
+def sub_conjpriorknownmean_loss(dico, mean, alpha_0, beta_0):
     """ Compute an estimation of the KL divergence between the conjugate
     prior when the mean is known and parameters for all Variational
     Parameters in the tree dictionary dico.
@@ -137,9 +151,9 @@ def sub_conjpriorknownmean_loss(dico, module, mean, alpha_0, beta_0):
     :return: estimation of the KL divergence between prior and current
     """
     logprior = 0.
-    for name, p in dico.items():
+    for _, p in dico.items():
         if isinstance(p, VariationalParameter):
-            theta = getattr(module, name)
+            theta = evaluate(p)
             S = (theta - mean).norm() ** 2
             n = np.prod(theta.size())
             alpha_n = alpha_0 + n/2
@@ -151,8 +165,8 @@ def sub_conjpriorknownmean_loss(dico, module, mean, alpha_0, beta_0):
             H = std.log().sum() + .5 * n * (1 + np.log(2*np.pi))
             logprior -= H
         else:
-            logprior += sub_conjpriorknownmean_loss(\
-                p, getattr(module, name), mean, alpha_0, beta_0)
+            logprior += sub_conjpriorknownmean_loss(
+                p, mean, alpha_0, beta_0)
     return logprior
 
 
@@ -175,13 +189,15 @@ class Variationalize(nn.Module):
         self.model = model
 
         self.dico = OrderedDict()
+        self._prior_loss_function = sub_prior_loss
         self._variationalize_module(self.dico, self.model, '', zero_mean,
                                     learn_mean, learn_rho)
 
     def _variationalize_module(self, dico, module, prefix, zero_mean,
                                learn_mean, learn_rho):
         to_erase = []
-        for name, p in module._parameters.items():  # pylint: disable=protected-access, line-too-long
+        paras = module._parameters.items()  # pylint: disable=protected-access
+        for name, p in paras:
             if p is None:
                 dico[name] = None
             else:
@@ -217,6 +233,27 @@ class Variationalize(nn.Module):
                                         learn_mean, learn_rho)
             dico[mname] = sub_dico
 
+    def set_prior(self, prior_type, **prior_parameters):
+        """ Change the prior to be used.
+
+        Acts inplace by modifying the value of _prior_loss_function
+        :args prior_type: one of 'gaussian', 'conjugate',
+            'conjugate_known_mean'
+        :args prior_parameters: the parameters for the associated prior
+        """
+        if prior_type == 'gaussian':
+            self._prior_loss_function = sub_prior_loss
+        if prior_type == 'conjugate':
+            self._prior_loss_function = functools.partial(
+                sub_conjprior_loss,
+                **prior_parameters
+            )
+        if prior_type == 'conjugate_known_mean':
+            self._prior_loss_function = functools.partial(
+                sub_conjpriorknownmean_loss,
+                **prior_parameters
+            )
+
     def forward(self, *inputs):
         def _epsilon_setting(name, p):  # pylint: disable=unused-argument
             if self.training:
@@ -228,16 +265,7 @@ class Variationalize(nn.Module):
 
     def prior_loss(self):
         """ Returns the prior loss """
-        return sub_prior_loss(self.dico)
-
-    def conjprior_loss(self, alpha_0=.5, beta_0=.5, mu_0=0, kappa_0=1.):
-        return sub_conjprior_loss(self.dico, self.model, alpha_0,
-                                  beta_0, mu_0, kappa_0)
-
-    def conjpriorknownmean_loss(self, mean=0., alpha_0=.5, beta_0=.5):
-        return sub_conjpriorknownmean_loss(self.dico, self.model, mean,
-                                           alpha_0, beta_0)
-
+        return self._prior_loss_function(self.dico)
 
 
 class Sample(nn.Module):

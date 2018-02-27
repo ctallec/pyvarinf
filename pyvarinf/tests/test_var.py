@@ -102,3 +102,14 @@ class TestVar(TestCase):
         out.backward(dx)
         for p in var_model.parameters():
             self.assertTrue((p.grad.abs().sum() > 0).data[0])
+
+    def test_conj(self):
+        """ Test conjugate priors """
+        x = Variable(torch.Tensor(1, 10).fill_(2))
+        model = nn.Linear(10, 10)
+        var_model = pyvarinf.Variationalize(model)
+        var_model.set_prior('conjugate', alpha_0=.5, beta_0=.5,
+                            mu_0=.5, kappa_0=.5)
+        var_model(x)
+        prior_loss = var_model.prior_loss()
+        prior_loss.backward()
