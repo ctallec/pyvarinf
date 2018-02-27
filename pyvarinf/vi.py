@@ -198,7 +198,7 @@ def sub_mixtgaussprior(dico, sigma_1, sigma_2, pi):
             theta = evaluate(p)
             n = np.prod(theta.size())
             theta2 = theta ** 2
-            pgauss1 = (- theta2 / sigma_1 ** 2).exp() / sigma_k
+            pgauss1 = (- theta2 / sigma_1 ** 2).exp() / sigma_1
             pgauss2 = (- theta2 / sigma_2 ** 2).exp() / sigma_2
             logprior += (pi * pgauss1 + (1 - pi) * pgauss2 + 1e-8).log().sum()
             logprior -= n / 2 * np.log(2 * np.pi)
@@ -214,7 +214,8 @@ class Variationalize(nn.Module):
     Variationalize changes all parameters of the given model
     to allow learning of a gaussian distribution over the
     parameters using Variational inference. For more information,
-    see e.g. TODO: REF.
+    see e.g. https://papers.nips.cc/paper/4329-practical-variational
+    -inference-for-neural-networks.pdf.
 
     :args model: the model on which VI is to be performed
     :args zero_mean: if True, sets initial mean to 0, else
