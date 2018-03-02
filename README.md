@@ -4,42 +4,76 @@ PyVarInf provides facilities to easily train your PyTorch neural network models 
 # Bayesian Deep Learning with Variational Inference
 
 ## Bayesian Deep Learning
-Assume we have a dataset D = {(x<sub>1</sub>, y<sub>1</sub>), ..., (x<sub>n</sub>, y<sub>n</sub>)} where the x<sub>i</sub> are the inputs and the y<sub>i</sub> are the outputs. The problem is to predict the y<sub>i</sub> from the x<sub>i</sub>. Here, a neural network is a parametric model p(D|θ), where θ is the *parameters* or the *weights*. The *network loss* is defined as
+Assume we have a dataset D = {(x<sub>1</sub>, y<sub>1</sub>), ...,
+(x<sub>n</sub>, y<sub>n</sub>)} where the x's are the inputs and the y's the
+outputs. The problem is to predict the y's from the x's. Further assume that
+p(D|θ) is the output of a neural network with *weights* θ. The *network loss*
+is defined as
 
 <img src="https://latex.codecogs.com/gif.latex?L^n(\theta)&space;=&space;-\log&space;p(D|\theta)&space;=&space;-\sum_i&space;p(y_i|x_i,&space;\theta)" title="L^n(\theta) = -\log p(D|\theta) = -\sum_i p(y_i|x_i, \theta)" />
 
-When usually training a neural network, we try to find the best parameter θ* which minimizes L<sup>n</sup>(θ).
+Usually, when training a neural network, we try to find the parameter θ* which minimizes L<sup>n</sup>(θ).
 
-In Bayesian Inference, the problem is instead to study the posterior distribution of the weights given the data. Assume we have a prior α over ℝ<sup>d</sup>. The posterior is
+In Bayesian Inference, the problem is instead to study the posterior
+distribution of the weights given the data. Assume we have a prior α over
+ℝ<sup>d</sup>. The posterior is
 
-<img src="https://latex.codecogs.com/gif.latex?p(\theta|D)&space;=&space;\frac{p(D|\theta)\alpha(\theta)}{\int_\theta&space;p(D|\theta)\alpha(\theta)&space;d\theta}" title="p(\theta|D) = \frac{p(D|\theta)\alpha(\theta)}{\int_\theta p(D|\theta)\alpha(\theta) d\theta}" />
+<img
+src="https://latex.codecogs.com/gif.latex?p(\theta|D)&space;=&space;\frac{p(D|\theta)\alpha(\theta)}{\int_\theta&space;p(D|\theta)\alpha(\theta)&space;d\theta}"
+title="p(\theta|D) = \frac{p(D|\theta)\alpha(\theta)}{\int_\theta
+p(D|\theta)\alpha(\theta) d\theta}" />
 
 This can be used for model selection, or prediction with Bayesian Model Averaging.
 
 ## Variational Inference
-It is usually impossible to compute analytically the posterior distribution, especially with complex models as neural networks. Variational Inference adress this problem by approximating the posterior p(θ|D) a parametric distribution q(θ|φ) where φ is a parameter. The problem is then not to learn a parameter θ* but a probability distribution q(θ|φ) minimizing 
+It is usually impossible to analytically compute the posterior distribution,
+especially models as complex as neural networks. Variational Inference adress
+this problem by approximating the posterior p(θ|D) by a parametric distribution
+q(θ|φ) where φ is a parameter. The problem is then not to learn a parameter θ*
+but a probability distribution q(θ|φ) minimizing 
 
 <img src="https://latex.codecogs.com/gif.latex?F(\phi)&space;=&space;\mathbf{E}_{\theta&space;\sim&space;q(\theta|\phi)}[L^N(\theta)]&space;&plus;&space;KL(q(.|\phi)\|\alpha)" title="F(\phi) = E_{\theta \sim q(\theta|\phi)}[L^N(\theta)] + KL(q(.|\phi)\|\alpha)" />
 
 F is called the *variational free energy*.
 
-This idea was originally introduced for deep learning by Hinton and Van Camp [5] as a way to use neural networks for Minimum Description Length [3].  Indeed, F can be interpreted as the total description length of the dataset D : 
-* L<sup>C</sup>(φ) = KL(q(.|φ)||α) is the complexity loss. It measures (in nats) the quantity of information contained in the model. It is indeed possible to encode the model in L<sup>C</sup>(φ) nats, with the *bits-back* code [4].
-* L<sup>E</sup>(φ) = __E__<sub>θ ~ q(θ|φ)</sub>[L<sup>n</sup>(θ)] is the error loss. It measures the necessary quantity of information for encoding the data D with the model. This code length can be achieved with a Shannon-Huffman code for instance.
+This idea was originally introduced for deep learning by Hinton and Van Camp
+[5] as a way to use neural networks for Minimum Description Length [3].
+MDL aims at minimizing the number of bits used to encode the whole dataset.
+Variational inference introduces one of many data encoding schemes.
+Indeed, F can be interpreted as the total description length of the dataset D,
+when we first encode the model, then encode the part of the data not explained by
+the model: 
+* L<sup>C</sup>(φ) = KL(q(.|φ)||α) is the complexity loss. It measures (in
+  nats) the quantity of information contained in the model. It is indeed
+  possible to encode the model in L<sup>C</sup>(φ) nats, with the *bits-back*
+  code [4].
+* L<sup>E</sup>(φ) = __E__<sub>θ ~ q(θ|φ)</sub>[L<sup>n</sup>(θ)] is the error
+  loss. It measures the necessary quantity of information for encoding the data
+  D with the model. This code length can be achieved with a Shannon-Huffman
+  code for instance.
 
-Therefore F(φ) = L<sup>C</sup>(φ) + L<sup>E</sup>(φ) can be rephrased as the MDL loss function which measures the total encoding length of the data.
+Therefore F(φ) = L<sup>C</sup>(φ) + L<sup>E</sup>(φ) can be rephrased as an
+MDL loss function which measures the total encoding length of the data.
 
 ## Practical Variational Optimisation
-In practice, we define φ = (µ, σ) in ℝ<sup>d</sup> x ℝ<sup>d</sup>, and q(.|φ) = N(µ, Σ) the multivariate distribution where Σ = diag(σ<sub>1</sub><sup>2</sup>, ..., σ<sub>d</sub><sup>2</sup>), and we want to find the optimal µ* and σ*.
+In practice, we define φ = (µ, σ) in ℝ<sup>d</sup> x ℝ<sup>d</sup>, and q(.|φ)
+= N(µ, Σ) the multivariate distribution where Σ =
+diag(σ<sub>1</sub><sup>2</sup>, ..., σ<sub>d</sub><sup>2</sup>), and we want to
+find the optimal µ* and σ*.
 
-With this choice of a gaussian posterior, the gradient of F can be estimated with a Monte Carlo method with backpropagation. This allows to use any gradient descent method used for non-variational optimisation [2]
+With this choice of a gaussian posterior, the a Monte Carlo estimate of the
+gradient of F w.r.t. µ and σ can be obtained with backpropagation. This allows
+to use any gradient descent method used for non-variational optimisation [2]
 
 
 # Overview of PyVarInf
-The core feature of PyVarInf is the `Variationalize` function. `Variationalize` takes a model as input and outputs a variationalized version of the model with gaussian posterior.
+The core feature of PyVarInf is the `Variationalize` function. `Variationalize`
+takes a model as input and outputs a variationalized version of the model with
+gaussian posterior.
 
 ## Definition of a variational model
-To define a variational model, first define a traditional PyTorch model, then use the Variationalize function : 
+To define a variational model, first define a traditional PyTorch model, then
+use the Variationalize function : 
 ```python
 import pyvarinf
 import torch
@@ -83,6 +117,8 @@ def train(epoch):
         optimizer.zero_grad()
         output = var_model(data)
         loss_error = F.nll_loss(output, target)
+	# The model is only sent once, thus the division by
+	# the number of datapoints used to train
         loss_prior = var_model.prior_loss() / 60000
         loss = loss_error + loss_prior
         loss.backward()
@@ -144,6 +180,3 @@ You need to have PyTorch installed for PyVarInf to work (as PyTorch is not readi
 * [4] Honkela, Antti and Valpola, Harri. Variational Learning and Bits-Back Coding: An Information-Theoretic View to Bayesian Learning. *IEEE transactions on Neural Networks*, 15(4), 2004.
 * [5] Hinton, Geoffrey E and Van Camp, Drew. Keeping Neural Networks Simple by Minimizing the Description Length of the Weights. In *Proceedings of the sixth annual conference on Computational learning theory*. ACM, 1993.
 * [6] Murphy, Kevin P. *Conjugate Bayesian analysis of the Gaussian distribution.*, 2007.
-
-
-
