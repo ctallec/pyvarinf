@@ -61,7 +61,7 @@ In practice, we define φ = (µ, σ) in ℝ<sup>d</sup> x ℝ<sup>d</sup>, and q
 diag(σ<sub>1</sub><sup>2</sup>, ..., σ<sub>d</sub><sup>2</sup>), and we want to
 find the optimal µ* and σ*.
 
-With this choice of a gaussian posterior, the a Monte Carlo estimate of the
+With this choice of a gaussian posterior, a Monte Carlo estimate of the
 gradient of F w.r.t. µ and σ can be obtained with backpropagation. This allows
 to use any gradient descent method used for non-variational optimisation [2]
 
