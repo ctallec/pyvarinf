@@ -27,7 +27,7 @@ This can be used for model selection, or prediction with Bayesian Model Averagin
 
 ## Variational Inference
 It is usually impossible to analytically compute the posterior distribution,
-especially models as complex as neural networks. Variational Inference adress
+especially with models as complex as neural networks. Variational Inference adress
 this problem by approximating the posterior p(θ|D) by a parametric distribution
 q(θ|φ) where φ is a parameter. The problem is then not to learn a parameter θ*
 but a probability distribution q(θ|φ) minimizing 
