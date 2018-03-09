@@ -10,7 +10,7 @@ outputs. The problem is to predict the y's from the x's. Further assume that
 p(D|θ) is the output of a neural network with *weights* θ. The *network loss*
 is defined as
 
-<img src="https://latex.codecogs.com/gif.latex?L^n(\theta)&space;=&space;-\log&space;p(D|\theta)&space;=&space;-\sum_i&space;p(y_i|x_i,&space;\theta)" title="L^n(\theta) = -\log p(D|\theta) = -\sum_i p(y_i|x_i, \theta)" />
+<img src="https://latex.codecogs.com/gif.latex?L^n(\theta)&space;=&space;-\log&space;p(D|\theta)&space;=&space;-\sum_i&space;\log&space;p(y_i|x_i,&space;\theta)" title="L^n(\theta) = -\log p(D|\theta) = -\sum_i \log p(y_i|x_i, \theta)" />
 
 Usually, when training a neural network, we try to find the parameter θ* which minimizes L<sup>n</sup>(θ).
 
@@ -152,7 +152,7 @@ There are five parameters that have to bet set :
 ### Conjugate prior with known mean
 The conjugate prior with known mean is similar to the conjugate prior. It is used if we assume that all the weights in a given layer should be distributed as a gaussian with a known mean but unknown variance. It is usefull in neural networks model when we assume that the weights in a layer should have mean 0. See [6] for more details. This prior can be set with :
 ```python
-var_model.set_prior('conjugate_known_mean', n_mc_samples, alpha_0, beta_0, mu_0, kappa_0)
+var_model.set_prior('conjugate_known_mean', n_mc_samples, mean, alpha_0, beta_0)
 ```
 Four parameters have to be set:
 * `n_mc_samples`, the number of samples used in the Monte Carlo estimation of the prior loss and its gradient.
