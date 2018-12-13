@@ -2,7 +2,7 @@
 from setuptools import setup
 
 main_version = '0'
-subversion = '1'
+subversion = '2'
 
 version = main_version + '.' + subversion
 setup(name='pyvarinf',
