@@ -255,10 +255,10 @@ class Variationalize(nn.Module):
                     None)
 
                 if learn_mean:
-                    self.register_parameter(prefix + '.' + name + '_mean',
+                    self.register_parameter(prefix + '_' + name + '_mean',
                                             dico[name].mean)
                 if learn_rho:
-                    self.register_parameter(prefix + '.' + name + '_rho',
+                    self.register_parameter(prefix + '_' + name + '_rho',
                                             dico[name].rho)
 
             to_erase.append(name)
@@ -269,7 +269,7 @@ class Variationalize(nn.Module):
         for mname, sub_module in module.named_children():
             sub_dico = OrderedDict()
             self._variationalize_module(sub_dico, sub_module,
-                                        prefix + ('.' if prefix else '') +
+                                        prefix + ('_' if prefix else '') +
                                         mname, zero_mean,
                                         learn_mean, learn_rho)
             dico[mname] = sub_dico

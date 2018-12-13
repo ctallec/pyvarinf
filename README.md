@@ -171,7 +171,7 @@ var_model.set_prior('mixtgauss', n_mc_samples, sigma_1, sigma_2, pi)
 * `pi` the probability of the first gaussian
 
 # Requirements
-You need to have PyTorch installed for PyVarInf to work (as PyTorch is not readily available on PyPi). To install PyTorch, follow the instructions described [here](http://pytorch.org/#pip-install-pytorch).
+This module requires Python 3. You need to have PyTorch installed for PyVarInf to work (as PyTorch is not readily available on PyPi). To install PyTorch, follow the instructions described [here](http://pytorch.org/#pip-install-pytorch).
 
 # References
 * [1] Blundell, Charles, Cornebise, Julien, Kavukcuoglu, Koray, and Wierstra, Daan. Weight Uncertainty in Neural Networks. In *International Conference on Machine Learning*, pp. 1613–1622, 2015.
