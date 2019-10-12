@@ -117,7 +117,7 @@ def train(epoch):
         if batch_idx % args.log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tLoss error: {:.6f}\tLoss weights: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.data[0], loss_error.data[0], loss_prior.data[0]))
+                100. * batch_idx / len(train_loader), loss.item(), loss_error.item(), loss_prior.item()))
 
 def test(epoch):
     var_model.eval()
@@ -128,7 +128,7 @@ def test(epoch):
             data, target = data.cuda(), target.cuda()
         data, target = Variable(data, volatile=True), Variable(target)
         output = var_model(data)
-        test_loss += F.nll_loss(output, target).data[0]
+        test_loss += F.nll_loss(output, target).item()
         pred = output.data.max(1)[1] # get the index of the max log-probability
         correct += pred.eq(target.data).cpu().sum()
 
